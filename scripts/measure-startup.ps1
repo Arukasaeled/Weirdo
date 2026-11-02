@@ -1,17 +1,17 @@
 param(
-    [string]$Executable = (Join-Path $env:LOCALAPPDATA 'Programs\Kooky\Kooky.exe'),
-    [string]$ExpectedVersion = '0.1.4',
+    [string]$Executable = (Join-Path $env:LOCALAPPDATA 'Programs\Weirdo\Weirdo.exe'),
+    [string]$ExpectedVersion = '0.2.1',
     [switch]$FunctionsOnly
 )
 
 $ErrorActionPreference = 'Stop'
 
-if (-not ('KookyStartupNative' -as [type])) {
+if (-not ('WeirdoStartupNative' -as [type])) {
     Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
 
-public static class KookyStartupNative
+public static class WeirdoStartupNative
 {
     [DllImport("kernel32.dll")]
     public static extern IntPtr GetCurrentProcess();
@@ -43,14 +43,14 @@ public static class KookyStartupNative
 '@
 }
 
-function Get-KookyWindowsEnvironment {
+function Get-WeirdoWindowsEnvironment {
     $token = [IntPtr]::Zero
     $block = [IntPtr]::Zero
     try {
-        if (-not [KookyStartupNative]::OpenProcessToken([KookyStartupNative]::GetCurrentProcess(), 0x000A, [ref]$token)) {
+        if (-not [WeirdoStartupNative]::OpenProcessToken([WeirdoStartupNative]::GetCurrentProcess(), 0x000A, [ref]$token)) {
             throw [ComponentModel.Win32Exception]::new([Runtime.InteropServices.Marshal]::GetLastWin32Error())
         }
-        if (-not [KookyStartupNative]::CreateEnvironmentBlock([ref]$block, $token, $false)) {
+        if (-not [WeirdoStartupNative]::CreateEnvironmentBlock([ref]$block, $token, $false)) {
             throw [ComponentModel.Win32Exception]::new([Runtime.InteropServices.Marshal]::GetLastWin32Error())
         }
         $variables = [Collections.Generic.Dictionary[string,string]]::new([StringComparer]::OrdinalIgnoreCase)
@@ -66,18 +66,18 @@ function Get-KookyWindowsEnvironment {
         return ,$variables
     }
     finally {
-        if ($block -ne [IntPtr]::Zero) { [void][KookyStartupNative]::DestroyEnvironmentBlock($block) }
-        if ($token -ne [IntPtr]::Zero) { [void][KookyStartupNative]::CloseHandle($token) }
+        if ($block -ne [IntPtr]::Zero) { [void][WeirdoStartupNative]::DestroyEnvironmentBlock($block) }
+        if ($token -ne [IntPtr]::Zero) { [void][WeirdoStartupNative]::CloseHandle($token) }
     }
 }
 
-function Start-KookyNormalEnvironment {
+function Start-WeirdoNormalEnvironment {
     param(
         [Parameter(Mandatory)][string]$ExecutablePath,
         [string[]]$Arguments = @(),
         [Collections.Generic.IDictionary[string,string]]$EnvironmentBlock
     )
-    if ($null -eq $EnvironmentBlock) { $EnvironmentBlock = Get-KookyWindowsEnvironment }
+    if ($null -eq $EnvironmentBlock) { $EnvironmentBlock = Get-WeirdoWindowsEnvironment }
     $start = [Diagnostics.ProcessStartInfo]::new([IO.Path]::GetFullPath($ExecutablePath))
     $start.UseShellExecute = $false
     $start.CreateNoWindow = $true
@@ -91,7 +91,7 @@ function Start-KookyNormalEnvironment {
     return [Diagnostics.Process]::Start($start)
 }
 
-function Find-KookyEnvironmentExecutable {
+function Find-WeirdoEnvironmentExecutable {
     param(
         [Parameter(Mandatory)][string]$Name,
         [Parameter(Mandatory)][Collections.Generic.IDictionary[string,string]]$EnvironmentBlock
@@ -111,19 +111,17 @@ $acceptanceRoot = [IO.Path]::Combine($projectRoot, 'artifacts', 'acceptance')
 [void][IO.Directory]::CreateDirectory($acceptanceRoot)
 $executablePath = [IO.Path]::GetFullPath($Executable)
 $installedFile = Get-Item -LiteralPath $executablePath
-if ($installedFile.VersionInfo.FileVersion -ne ($ExpectedVersion + '.0')) {
-    throw "Installed version $($installedFile.VersionInfo.FileVersion) does not match expected $ExpectedVersion.0."
+if ($installedFile.VersionInfo.FileVersion -notin @($ExpectedVersion, $ExpectedVersion + '.0')) {
+    throw "Installed version $($installedFile.VersionInfo.FileVersion) does not match expected $ExpectedVersion."
 }
-$preexisting = @(Get-CimInstance Win32_Process -Filter "Name = 'Kooky.exe'")
-if ($preexisting.Count -gt 0) {
-    throw "Found $($preexisting.Count) existing Kooky process(es). Startup measurement requires a stopped app."
-}
-$normalEnvironment = Get-KookyWindowsEnvironment
+# Each sample uses a fresh profile. Tauri instances are scoped to that profile,
+# allowing measurement without disturbing another open workbench.
+$normalEnvironment = Get-WeirdoWindowsEnvironment
 $runId = Get-Date -Format 'yyyyMMdd-HHmmss'
 $environmentSummary = [ordered]@{
     source = 'userenv.dll CreateEnvironmentBlock, current Windows user token, inherit=false'
-    resolvedPwsh = Find-KookyEnvironmentExecutable -Name 'pwsh.exe' -EnvironmentBlock $normalEnvironment
-    resolvedWindowsPowerShell = Find-KookyEnvironmentExecutable -Name 'powershell.exe' -EnvironmentBlock $normalEnvironment
+    resolvedPwsh = Find-WeirdoEnvironmentExecutable -Name 'pwsh.exe' -EnvironmentBlock $normalEnvironment
+    resolvedWindowsPowerShell = Find-WeirdoEnvironmentExecutable -Name 'powershell.exe' -EnvironmentBlock $normalEnvironment
     hasTerm = $normalEnvironment.ContainsKey('TERM')
     hasNoColor = $normalEnvironment.ContainsKey('NO_COLOR')
     hasPsModulePath = $normalEnvironment.ContainsKey('PSModulePath')
@@ -139,7 +137,7 @@ $report = [ordered]@{
     executable = $executablePath
     fileVersion = $installedFile.VersionInfo.FileVersion
     productVersion = $installedFile.VersionInfo.ProductVersion
-    assemblySha256 = (Get-FileHash -LiteralPath ([IO.Path]::Combine($installedFile.DirectoryName, 'Kooky.dll')) -Algorithm SHA256).Hash
+    executableSha256 = (Get-FileHash -LiteralPath $executablePath -Algorithm SHA256).Hash
     expectedVersion = $ExpectedVersion
     debug = $false
     environment = $environmentSummary
@@ -179,7 +177,7 @@ try {
         $measurementFailure = $null
         try {
             $timer = [Diagnostics.Stopwatch]::StartNew()
-            $process = Start-KookyNormalEnvironment -ExecutablePath $executablePath -Arguments @('--data-dir', $profile) -EnvironmentBlock $normalEnvironment
+            $process = Start-WeirdoNormalEnvironment -ExecutablePath $executablePath -Arguments @('--data-dir', $profile) -EnvironmentBlock $normalEnvironment
             $sample.processId = $process.Id
             $ownedProcessIds += $process.Id
             $startup = $null
@@ -205,9 +203,9 @@ try {
             $process.Refresh()
             $window = $process.MainWindowHandle
             $sample.nativeWindowHandle = '0x' + $window.ToString('X')
-            $sample.visible = $window -ne [IntPtr]::Zero -and [KookyStartupNative]::IsWindowVisible($window)
+            $sample.visible = $window -ne [IntPtr]::Zero -and [WeirdoStartupNative]::IsWindowVisible($window)
             $messageResult = [UIntPtr]::Zero
-            $sample.responsive = $window -ne [IntPtr]::Zero -and [KookyStartupNative]::SendMessageTimeoutW($window, 0, [UIntPtr]::Zero, [IntPtr]::Zero, 3, 1500, [ref]$messageResult) -ne [IntPtr]::Zero
+            $sample.responsive = $window -ne [IntPtr]::Zero -and [WeirdoStartupNative]::SendMessageTimeoutW($window, 0, [UIntPtr]::Zero, [IntPtr]::Zero, 3, 1500, [ref]$messageResult) -ne [IntPtr]::Zero
             if (-not $sample.visible -or -not $sample.responsive) { throw 'The main native window is not both visible and responsive.' }
             $bootstrap = & (Join-Path $PSScriptRoot 'rpc.ps1') -Type 'bootstrap' -DataDir $profile
             $sample.brokerProcessId = $bootstrap.brokerPid
@@ -225,7 +223,7 @@ try {
             }
             if ($null -ne $process) { $sample.uiExited = $process.WaitForExit(10000) }
             if ($null -ne $brokerProcess) { $sample.brokerExited = $brokerProcess.WaitForExit(10000) }
-            $remaining = @(Get-CimInstance Win32_Process -Filter "Name = 'Kooky.exe'" | Where-Object {
+            $remaining = @(Get-CimInstance Win32_Process -Filter "Name = 'Weirdo.exe'" | Where-Object {
                 $ownedProcessIds -contains [int]$_.ProcessId -or ($_.CommandLine -and $_.CommandLine.Contains($profile))
             })
             $sample.remainingOwnedProcesses = @($remaining | Select-Object ProcessId, ParentProcessId, CommandLine)

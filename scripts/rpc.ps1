@@ -1,9 +1,9 @@
-param([Parameter(Mandatory)][string]$Type,[string]$Payload='{}',[string]$DataDir=(Join-Path $env:LOCALAPPDATA 'Kooky'))
+param([Parameter(Mandatory)][string]$Type,[string]$Payload='{}',[string]$DataDir=(Join-Path $env:LOCALAPPDATA 'Weirdo'))
 $ErrorActionPreference='Stop'
 $identity=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $key=$identity+[IO.Path]::GetFullPath($DataDir).ToUpperInvariant()
 $hash=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($key)))
-$pipe=[IO.Pipes.NamedPipeClientStream]::new('.','kooky-'+$hash.Substring(0,24),[IO.Pipes.PipeDirection]::InOut,[IO.Pipes.PipeOptions]::Asynchronous)
+$pipe=[IO.Pipes.NamedPipeClientStream]::new('.','weirdo-'+$hash.Substring(0,24),[IO.Pipes.PipeDirection]::InOut,[IO.Pipes.PipeOptions]::Asynchronous)
 try {
   $pipe.Connect(10000)
   $reader=[IO.StreamReader]::new($pipe,[Text.Encoding]::UTF8,$false,65536,$true)

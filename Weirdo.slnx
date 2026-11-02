@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Weirdo.App/Weirdo.App.csproj" />
+    <Project Path="src/Weirdo.Core/Weirdo.Core.csproj" />
+  </Folder>
+</Solution>

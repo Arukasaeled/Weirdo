@@ -1,4 +1,4 @@
-// Adapted from Kooky PaneNode.swift, copyright (c) 2026 kooky contributors, MIT.
+// Pane-tree adaptation under MIT. Original source and copyright in SOURCE-NOTICE.md.
 // Windows changes: typed JSON tree, immutable split/removal, per-pane tab transfer.
 import type { Pane, PaneNode, Workspace, AppState } from './types.ts';
 export function newPane():Pane { return {type:'pane',id:crypto.randomUUID(),tabs:[],activeTabId:null}; }

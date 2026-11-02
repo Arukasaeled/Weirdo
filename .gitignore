@@ -7,3 +7,6 @@ dist/
 .tools/
 artifacts/
 *.user
+node_modules/
+src-tauri/target/
+src-tauri/gen/

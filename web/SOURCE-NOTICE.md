@@ -1,10 +1,10 @@
-# Frontend source and assets
+# Weirdo frontend source and assets
 
-Kooky for Windows adapts the pane-tree semantics in `src/layout.ts` from
+Weirdo adapts the pane-tree semantics in `src/layout.ts` from
 `iAmCorey/kooky`, commit `fc54bd9002aa97fd6d67edb9d13c4b5143360fee`,
 `Sources/KookyKit/Sessions/PaneNode.swift` (MIT, copyright 2026 kooky contributors).
 Windows changes include typed JSON persistence, immutable tree transformations,
-DOM rendering, per-pane tab transfer and WebView2 IPC.
+DOM rendering, per-pane tab transfer and Tauri host IPC.
 
 The dense sidebar, per-pane tabs and compact status bars follow Kooky's product
 layout. `src/terminal.ts` adapts the bundled GitHub/Shiki ANSI palettes; the dark

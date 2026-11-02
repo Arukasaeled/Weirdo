@@ -1,43 +1,27 @@
-# Windows 性能实测
+# Weirdo 0.2.1 measurements
 
-设备：Windows 11 build 26200，x64，18 个逻辑处理器。所有数字来自本机真实进程，未将 Agent 占用算入宿主。CPU 是整机容量百分比；1 个逻辑核满载约为 5.56%。工作集受 Windows 分页影响，不能等同于分配的私有内存。
+Measured on this Windows machine on 2026-11-02. CPU percentages use total machine capacity across18 logical processors. Measurements include the native host, system WebView2, ConPTY and actual official CLI processes.
 
-## 启动
+## Startup and package
 
-最终安装版 0.1.5，正常 Windows 用户环境（`CreateEnvironmentBlock(inherit=false)`），关闭开发工具，三个全新配置目录：
+The installed normal application reached its frontend-ready signal with a visible responsive native window in1888.81,1595.33 and1883.47ms. Median1883.47ms. Each sample used a fresh isolated profile and the normal Windows user environment. UI and broker exited cleanly after each sample. This measures ordinary startup and excludes the one-time import of existing encrypted history.
 
-| 次数 | 从进程开始到字体加载和首帧就绪 |
-| --- | ---: |
-| 1 | 2399.53 ms |
-| 2 | 1762.37 ms |
-| 3 | 1687.29 ms |
+The Tauri NSIS installer is approximately4.43MiB before the final connection-readiness adjustment. The precise delivered bytes and SHA-256 are in dist/SHA256SUMS.txt. The package uses the system WebView2 runtime and two native executables, without a separately installed .NET runtime.
 
-中位数 **1762.37 ms**。三个窗口均通过实际可见性与原生消息响应检查；每次退出后 UI、Broker 全部停止。不是清空操作系统缓存后的冷启动测试。此前 0.1.4 同法测量中位数 2229.20 ms，波动与系统缓存、并行负载有关，不声称这代表版本加速。
+## Five-terminal resource sample
 
-## 五终端空闲
+Twenty one-second intervals were captured with Claude, Codex and three PowerShell terminals. The project still contained625 changed/untracked implementation files, so the broker was actively calculating Git statistics.
 
-安装版 0.1.4，正常 Windows 环境，Claude Code、Codex 与三个 PowerShell，两个可见终端 Pane；20 次独立进程快照，累计采样 33.15 秒。CDP 仅用于界面验收，此次资源采样通过 .NET 进程 API 获取。Agent 已启动、会话恢复后处于等待输入状态。
+| Process group | Average working set MiB | Average private allocation MiB | Average CPU % |
+| --- | --- | --- | --- |
+| Host and broker |114.60|79.16|1.5050|
+| WebView2 |135.72|293.12|0.1169|
+| ConPTY consoles |4.73|10.79|0.0000|
+| PowerShell |5.82|84.23|0.0000|
+| Agent child processes |51.99|420.00|0.0162|
 
-| 进程组 | 平均工作集 MiB | 峰值工作集 MiB | 平均私有内存 MiB | 平均 CPU |
-| --- | ---: | ---: | ---: | ---: |
-| 原生宿主 + Broker | 34.25 | 44.78 | 90.57 | 0.0215% |
-| WebView2 渲染与浏览器进程 | 81.92 | 85.74 | 279.08 | 0.0786% |
-| 五个 ConPTY/conhost | 4.63 | 7.33 | 13.84 | 0.0000% |
-| 三个 PowerShell 及其子进程 | 6.79 | 7.84 | 96.37 | 0.0027% |
-| Claude/Codex 及其子进程 | 83.66 | 90.88 | 1041.61 | 0.0356% |
+The host itself averaged86.99MiB working set and the broker27.61MiB. The broker accounts for the measured host-group CPU while inspecting the uncommitted source tree. Raw per-process records are in artifacts/acceptance/resources-021.jsonl.
 
-这组较小的工作集包含 Windows 对空闲进程的分页，私有内存仍然存在。此前界面持续操作后的 0.1.3 同样五终端采样中，宿主工作集 76.15 MiB、WebView2 202.83 MiB、ConPTY 37.13 MiB、Shell 93.85 MiB、Agent 832.42 MiB。两组均保留，避免只报告较有利的驻留值。
+Windows paging strongly affects working sets. Private allocation is included so these measurements cannot be mistaken for fixed process-memory requirements. Agent model/provider behavior, repository size, output volume and the number of visible WebViews change the results.
 
-## 输出和稳定性
-
-- 真实 PowerShell 输出 **20,000 行中文，929,346 字节**，从发送命令到读取完成标记 **1755.83 ms**。该数字含 IPC 和轮询开销，不能当作纯渲染耗时。
-- 同期浏览器 `requestAnimationFrame` 采样 718 帧：平均间隔 16.74 ms，P95 17.10 ms，最大 33.30 ms。窗口在采样期间发生可见性变化；这是帧回调观测，不是 GPU 基准或所有机器的帧率保证。
-- 五个真实终端连续运行 **74 分钟以上**，包含两个真实 Agent、模型调用、切换和分屏。未发现崩溃、丢失进程或死锁；这不替代数天压力测试。
-- 独立 Broker 测试验证 32 个并发客户端、101 段输入顺序、查询与输入并行、关闭输出洪流、子进程树回收。最近 Release 输入响应采样 2.12 ms；其他轮次 0.3–0.6 ms，均低于测试上限 500 ms。
-- 原始输出回放上限约每终端 2 MiB，前端滚动历史 5000 行；已关闭会话最多保留 32 个有界回放记录。
-
-## 重现与证据
-
-`scripts/measure-startup.ps1` 进行三次正常环境启动；`scripts/measure-resources.ps1` 按实际父子进程归组采样，输出所有 PID、工作集、私有内存和 CPU，不依赖固定名称冒充进程状态。
-
-本机原始证据：`artifacts/acceptance/startup-20261102-165146.json`、`startup-20261102-154519.json`、`resources-final.jsonl`、`performance-final-summary.json`、`resources-idle.jsonl`、`render-burst.json`、`render-frame-times.json`、`final-soak.json`。原始验收目录不进入发布包，也不进入 Git，因为其中包含真实 CLI 会话与本机配置副本。
+The new project chooser completed its observed validation/display step in24.3ms before Git and runtime probes completed. Tree expansion, refresh and tab/workspace switching were checked against real directory contents.

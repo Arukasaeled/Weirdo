@@ -1,8 +1,8 @@
-param([Parameter(Mandatory)][int]$KookyProcessId,[string]$WindowName,[string]$InvokeName,[string]$SetValueId,[string]$Text)
+param([Parameter(Mandatory)][int]$WeirdoProcessId,[string]$WindowName,[string]$InvokeName,[string]$SetValueId,[string]$Text)
 $ErrorActionPreference='Stop'
 $desktopRuntime=Get-ChildItem -LiteralPath "$env:ProgramFiles\dotnet\shared\Microsoft.WindowsDesktop.App" -Directory | Sort-Object {[version]$_.Name} -Descending | Select-Object -First 1
 foreach($assembly in @('UIAutomationTypes.dll','UIAutomationClient.dll')){[void][Reflection.Assembly]::LoadFrom((Join-Path $desktopRuntime.FullName $assembly))}
-$condition=[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ProcessIdProperty,$KookyProcessId)
+$condition=[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ProcessIdProperty,$WeirdoProcessId)
 $windows=[System.Windows.Automation.AutomationElement]::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children,$condition)
 $found=$false
 foreach($window in $windows){

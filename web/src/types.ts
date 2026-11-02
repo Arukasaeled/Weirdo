@@ -1,4 +1,4 @@
-export interface AgentProfile { id:string; name:string; command:string; kind:string; env:Record<string,string>; resumeArguments?:string|null; builtIn:boolean; available:boolean }
+export interface AgentProfile { id:string; name:string; command:string; kind:string; env:Record<string,string>; model?:string|null; resumeArguments?:string|null; builtIn:boolean; available:boolean }
 export interface SessionInfo { id:string; workspaceId:string; title:string; agentId:string; cwd:string; processId:number; running:boolean; exitCode?:number|null; startedAt:string; lastOutputAt?:string|null; nativeSessionId?:string|null; cols:number; rows:number; bytesRead:number }
 export interface Chunk { sessionId:string; sequence:number; data:string }
 export interface Replay extends Chunk { truncated:boolean }
