@@ -10,7 +10,7 @@ foreach($window in $windows){
   $elements=$window.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.Condition]::TrueCondition)
   foreach($element in $elements){
     $type=$element.Current.ControlType.ProgrammaticName
-    if($InvokeName -and $element.Current.Name -eq $InvokeName -and $type -eq 'ControlType.Button'){
+    if($InvokeName -and $element.Current.Name -eq $InvokeName -and $type -in @('ControlType.Button','ControlType.MenuItem')){
       $element.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke();$found=$true;return
     } elseif($SetValueId -and $element.Current.AutomationId -eq $SetValueId){
       $element.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue($Text);$element.SetFocus();$found=$true;return

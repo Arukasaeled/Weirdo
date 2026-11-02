@@ -4,11 +4,13 @@
 
 ## 运行与安装
 
-安装 `dist/Kooky-0.1.3-win-x64.msi`，或运行便携目录中的 `dist/app/Kooky.exe`。无需安装 .NET；需要 Windows 10/11 x64 和 Microsoft Edge WebView2 Runtime。安装程序按当前用户安装到 `%LOCALAPPDATA%\Programs\Kooky`。
+安装 `dist/Kooky-0.1.5-win-x64.msi`，或运行便携目录中的 `dist/app/Kooky.exe`。无需安装 .NET；需要 Windows 10/11 x64 和 Microsoft Edge WebView2 Runtime。安装程序按当前用户安装到 `%LOCALAPPDATA%\Programs\Kooky`。
 
 点击“打开项目”，再选择 PowerShell、Claude Code、Codex 或 Gemini。Agent CLI 需要预先安装并配置；Kooky 继承启动环境，不代理模型请求，不重写 CLI 的权限机制。内置 Codex 使用 `--no-daemon`，避免与 Codex Desktop 的共享服务冲突；需要支持此参数的官方版本（已验证 0.162.0），旧版本可在 Agent 设置中删除该参数。
 
 所有 Agent 端点、模型及凭据仍由官方 CLI 处理。“设置 → Agent”可以编辑命令、自定义环境变量、集成类型和恢复参数。显式配置的环境变量以 Windows DPAPI 加密保存，仅当前 Windows 用户可解密。
+
+原生 EXE 及其参数直接传给 Windows；需要管道、重定向或 shell 表达式时，显式使用 `powershell.exe -Command "…"` 或 `cmd.exe /c "…"`。终端默认报告 `TERM=xterm-256color` 与 `COLORTERM=truecolor`，显式 Agent 环境变量仍可覆盖。
 
 ## 使用
 

@@ -4,6 +4,14 @@ using System.Text.Json;
 using Kooky.Core;
 using Kooky.Core.Services;
 
+if (args.FirstOrDefault() == "--native-launch-fixture")
+{
+    Console.OutputEncoding = new UTF8Encoding(false);
+    Console.Write(JsonSerializer.Serialize(new { arguments = args.Skip(1).ToArray(), environment = Environment.GetEnvironmentVariable("KOOKY_NATIVE_FIXTURE_ENV"), executable = Environment.ProcessPath }));
+    Environment.ExitCode = 17;
+    return;
+}
+
 var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "fixtures", "run-" + Guid.NewGuid().ToString("N")));
 Directory.CreateDirectory(root);
 var passed = 0;
@@ -48,6 +56,37 @@ try
     var profiles = catalog.List();
     Check(profiles.Count == 4 && profiles.All(p => p.BuiltIn), "four real built-in Agent profiles");
     Check(profiles.Single(p => p.Id == "shell").Available, "native PowerShell discovered");
+    var terminalKeys = new[] { "TERM", "COLORTERM", "TERM_PROGRAM" };
+    var originalTerminalEnvironment = terminalKeys.ToDictionary(key => key, Environment.GetEnvironmentVariable);
+    try
+    {
+        Environment.SetEnvironmentVariable("TERM", "dumb");
+        Environment.SetEnvironmentVariable("COLORTERM", "automation-color");
+        Environment.SetEnvironmentVariable("TERM_PROGRAM", "Automation Parent");
+        var inherited = CommandResolver.InheritedEnvironment();
+        var terminalCatalog = new AgentCatalog(Path.Combine(root, "terminal-environment"));
+        var defaults = terminalCatalog.Resolve(new() { Cwd = root, AgentId = "shell" });
+        Check(defaults.Environment["TERM"] == "xterm-256color" && defaults.Environment["COLORTERM"] == "truecolor" && defaults.Environment["TERM_PROGRAM"] == "Kooky",
+            "real terminal defaults replace inherited automation terminal capabilities");
+        Check(inherited.Where(item => !terminalKeys.Contains(item.Key, StringComparer.OrdinalIgnoreCase)).All(item => defaults.Environment.TryGetValue(item.Key, out var actual) && actual == item.Value),
+            "terminal defaults preserve all unrelated inherited environment values");
+        var terminalProfiles = terminalCatalog.List();
+        var shellIndex = terminalProfiles.FindIndex(profile => profile.Id == "shell");
+        terminalProfiles[shellIndex] = terminalProfiles[shellIndex] with { Env = new() { ["TERM"] = "vt100", ["COLORTERM"] = "profile-color", ["TERM_PROGRAM"] = "Profile Terminal" } };
+        terminalCatalog.Save(terminalProfiles);
+        var profileOverride = terminalCatalog.Resolve(new() { Cwd = root, AgentId = "shell" });
+        Check(profileOverride.Environment["TERM"] == "vt100" && profileOverride.Environment["COLORTERM"] == "profile-color" && profileOverride.Environment["TERM_PROGRAM"] == "Profile Terminal",
+            "explicit Agent terminal capabilities override host defaults");
+        var requestOverride = terminalCatalog.Resolve(new() { Cwd = root, AgentId = "shell", Env = new() { ["TERM"] = "screen-256color", ["COLORTERM"] = "", ["TERM_PROGRAM"] = "Requested Terminal" } });
+        Check(requestOverride.Environment["TERM"] == "screen-256color" && requestOverride.Environment["COLORTERM"] == "" && requestOverride.Environment["TERM_PROGRAM"] == "Requested Terminal",
+            "explicit session terminal capabilities override Agent values");
+        Check(Environment.GetEnvironmentVariable("TERM") == "dumb" && Environment.GetEnvironmentVariable("COLORTERM") == "automation-color" && Environment.GetEnvironmentVariable("TERM_PROGRAM") == "Automation Parent",
+            "terminal capability resolution leaves parent environment intact");
+    }
+    finally
+    {
+        foreach (var (key, value) in originalTerminalEnvironment) Environment.SetEnvironmentVariable(key, value);
+    }
     var secret = "test-secret-" + Guid.NewGuid();
     var customPath = Path.Combine(root, "工具 space & test.cmd");
     File.WriteAllText(customPath, "@echo off\r\necho %KOOKY_TEST_ENV%\r\nexit /b 7\r\n", new UTF8Encoding(false));
@@ -71,6 +110,7 @@ try
         Check(launched.ExitCode == 7 && (await stdout).Contains(secret) && (await stderr).Length == 0, "real cmd launcher supports spaces Unicode ampersand and exit code");
     }
     finally { Environment.SetEnvironmentVariable("KOOKY_TEST_INHERITED", oldValue); }
+    await NativeLauncherTests.RunAsync(Check, root);
     var shellLaunch = catalog.Resolve(new() { Cwd = root, AgentId = "shell" });
     Check(Encoding.Unicode.GetString(Convert.FromBase64String(shellLaunch.CommandLine.Split(' ')[^1])).Contains("']7;'"), "shell prompt has session-local OSC7 integration");
     if (profiles.Single(p => p.Id == "claude").Available)

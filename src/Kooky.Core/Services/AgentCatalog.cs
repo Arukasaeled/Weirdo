@@ -87,15 +87,15 @@ public sealed class AgentCatalog
         if (!Directory.Exists(cwd)) throw new DirectoryNotFoundException($"Workspace folder does not exist: {cwd}");
         var profile = List().Find(p => p.Id == request.AgentId) ?? throw new ArgumentException("The selected Agent profile no longer exists.");
         var environment = CommandResolver.InheritedEnvironment();
+        environment["TERM"] = "xterm-256color";
+        environment["COLORTERM"] = "truecolor";
+        environment["TERM_PROGRAM"] = "Kooky";
         foreach (var (key, value) in profile.Env) environment[key] = value;
         if (request.Env is not null)
         {
             CommandResolver.ValidateEnvironment(request.Env);
             foreach (var (key, value) in request.Env) environment[key] = value;
         }
-        environment.TryAdd("TERM", "xterm-256color");
-        environment.TryAdd("COLORTERM", "truecolor");
-        environment.TryAdd("TERM_PROGRAM", "Kooky");
         if (profile.Kind == "codex")
         {
             if (!Guid.TryParseExact(request.TrackingId, "N", out _)) throw new ArgumentException("The terminal tracking ID must be a 32-character UUID.");
@@ -141,8 +141,12 @@ public sealed class AgentCatalog
             const string prompt = "$script:KookyOriginalPrompt=$function:prompt; function global:prompt { $p=$executionContext.SessionState.Path.CurrentFileSystemLocation.Path; [Console]::Write([char]27+']7;'+([uri]$p).AbsoluteUri+[char]7); & $script:KookyOriginalPrompt }";
             commandLine = CommandResolver.QuoteWindows(path) + " -NoLogo -NoProfile -NoExit -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(prompt));
         }
-        else if (string.IsNullOrWhiteSpace(tail) && Path.GetExtension(path).Equals(".exe", StringComparison.OrdinalIgnoreCase))
-            commandLine = CommandResolver.QuoteWindows(path) + additionalArguments;
+        else if (Path.GetExtension(path).Equals(".exe", StringComparison.OrdinalIgnoreCase))
+        {
+            // Native applications own their Windows argument parsing and process identity.
+            // For shell expressions, explicitly select powershell.exe/pwsh.exe -Command.
+            commandLine = CommandResolver.QuoteWindows(path) + (string.IsNullOrWhiteSpace(tail) ? "" : " " + tail) + additionalArguments;
+        }
         else if ((string.IsNullOrWhiteSpace(tail) || (profile.Id == "codex" && tail == "--no-daemon")) && Path.GetExtension(path).ToLowerInvariant() is ".cmd" or ".bat")
         {
             var cmd = System.Environment.GetEnvironmentVariable("COMSPEC") ?? Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.System), "cmd.exe");
@@ -150,7 +154,8 @@ public sealed class AgentCatalog
         }
         else
         {
-            // Custom commands are intentionally PowerShell expressions. Encoding keeps them out of cmd.exe's parser.
+            // Script launchers retain their PowerShell expression handling. Encoding keeps
+            // those arguments out of cmd.exe's parser while .exe commands launch directly.
             var script = "$global:LASTEXITCODE=0; & " + CommandResolver.QuotePowerShell(path) + " " + tail + additionalArguments + "; $kookySucceeded=$?; if (!$kookySucceeded -and $LASTEXITCODE -eq 0) { exit 1 }; exit $LASTEXITCODE";
             commandLine = CommandResolver.PowerShellCommand(script, environment: environment);
         }

@@ -11,5 +11,5 @@ Services integration notes:
 - `StateStore.RecoveryWarnings` exposes any recovery performed; a future schema is rejected without mutation.
 - `GitInfo.Error` can accompany valid repository data when line totals are partial due to a large/unreadable file or a timeout. Display this instead of claiming complete counts.
 - Codex discovery binds an interactive CLI header only when its originator ends with the exact per-launch `/Kooky:<TrackingId>` marker. The child-only environment retains the existing originator prefix. Startup delays and same-directory parallel sessions do not change attribution. Legacy unmarked sessions and duplicate native IDs for one marker remain unknown; supplied native UUIDs always use exact `codex resume UUID`.
-- Custom commands are PowerShell expressions after the executable; standalone native EXEs and CMD launchers avoid an extra PowerShell process.
+- Native EXE commands launch directly and use Windows argument quoting. Use an explicit `powershell.exe -Command` or `pwsh.exe -Command` for shell expressions. Existing script-launcher handling remains in place.
 - Shell cwd integration lives only in the launched PowerShell process. No profile scripts are written.
