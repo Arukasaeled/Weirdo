@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Kooky.App/Kooky.App.csproj" />
+    <Project Path="src/Kooky.Core/Kooky.Core.csproj" />
+  </Folder>
+</Solution>

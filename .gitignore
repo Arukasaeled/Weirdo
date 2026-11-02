@@ -1,0 +1,9 @@
+reference/
+**/bin/
+**/obj/
+web/node_modules/
+web/dist/
+dist/
+.tools/
+artifacts/
+*.user
